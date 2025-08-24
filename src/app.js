@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 
 // Import routes
 const resourceRoutes = require('./routes/resourceRoutes');
+const memberRoutes = require('./routes/memberRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -18,6 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/resources', resourceRoutes);
+app.use('/api/members', memberRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -49,6 +51,7 @@ app.listen(PORT, () => {
   console.log(`🚀 OppoTrain Backend server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔗 Resources API: http://localhost:${PORT}/api/resources`);
+  console.log(`👥 Members API: http://localhost:${PORT}/api/members`);
 });
 
 module.exports = app;

@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # 🚀 OppoTrain Backend API
+  oppotrain-backend:
+    build: .
+    container_name: oppotrain-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    networks:
+      - oppotrain-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # 🌐 Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: oppotrain-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - oppotrain-backend
+    networks:
+      - oppotrain-network
+    profiles:
+      - production
+
+  # 📊 Redis Cache (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: oppotrain-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - oppotrain-network
+    profiles:
+      - production
+
+  # 🗄️ MongoDB (Alternative to Firestore - Optional)
+  mongodb:
+    image: mongo:7
+    container_name: oppotrain-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+      - MONGO_INITDB_DATABASE=oppotrain
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - oppotrain-network
+    profiles:
+      - alternative-db
+
+volumes:
+  redis_data:
+    driver: local
+  mongodb_data:
+    driver: local
+
+networks:
+  oppotrain-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
