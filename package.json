@@ -1,0 +1,30 @@
+{
+  "name": "oppotrain-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AdhamLahlouh03/OppoTrain-Backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AdhamLahlouh03/OppoTrain-Backend/issues"
+  },
+  "homepage": "https://github.com/AdhamLahlouh03/OppoTrain-Backend#readme",
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "firebase": "^12.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
