@@ -1,0 +1,18 @@
+# Node modules
+node_modules
+
+# Environment variables
+.env
+
+# Firebase service account 
+src/config/serviceAccountKey.json
+
+# Logs
+npm-debug.log
+yarn-error.log
+logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
