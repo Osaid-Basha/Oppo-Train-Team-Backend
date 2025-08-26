@@ -156,8 +156,7 @@ async acceptMember(req, res) {
       console.error('Error deactivating member:', error);
       res.status(500).json({ error: 'Failed to deactivate member' });
     }
-  }
-,  
+  },
 
   // 🔹 Delete member
   async deleteMember(req, res) {
