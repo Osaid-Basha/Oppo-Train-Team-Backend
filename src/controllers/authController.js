@@ -1,6 +1,7 @@
 const axios = require("axios");
-const { db, auth } = require("../config/firebase"); // لاحظ ضفت auth
+const { admin, db, auth } = require("../config/firebase");
 const nodemailer = require("nodemailer");
+const CONSTANTS = require("../utils/constants");
 
 const apiKey = process.env.FIREBASE_API_KEY;
 
@@ -10,6 +11,64 @@ function generateOTP() {
 }
 
 const authController = {
+   // 🔹 Register new user
+  async register(req, res) {
+    try {
+      const { email, password, full_name, student_id, phone, university, year_of_study } = req.body;
+
+      if (!email || !password || !full_name || !student_id) {
+        return res
+          .status(CONSTANTS.HTTP_STATUS.BAD_REQUEST)
+          .json({ error: "Email, password, full_name and student_id are required" });
+      }
+
+      // check for existing student ID
+      const existingStudent = await db
+        .collection(CONSTANTS.COLLECTIONS.USERS)
+        .where("student_id", "==", student_id)
+        .get();
+
+      if (!existingStudent.empty) {
+        return res
+          .status(CONSTANTS.HTTP_STATUS.CONFLICT)
+          .json({ error: CONSTANTS.ERROR_MESSAGES.STUDENT_ID_EXISTS });
+      }
+
+      // create user in Firebase Authentication
+      const userRecord = await auth.createUser({ email, password });
+
+      const userData = {
+        email,
+        full_name,
+        student_id,
+        phone: phone || "",
+        university: university || "",
+        year_of_study: year_of_study || "",
+        is_member: false,
+        membership_status: CONSTANTS.MEMBERSHIP_STATUS.PENDING,
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      await db.collection(CONSTANTS.COLLECTIONS.USERS).doc(userRecord.uid).set(userData);
+
+      res.status(CONSTANTS.HTTP_STATUS.CREATED).json({
+        message: CONSTANTS.SUCCESS_MESSAGES.USER_REGISTERED,
+        user: { id: userRecord.uid, ...userData }
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      let status = CONSTANTS.HTTP_STATUS.INTERNAL_SERVER_ERROR;
+      let message = error.message;
+
+      if (error.code === CONSTANTS.FIREBASE_ERRORS.EMAIL_ALREADY_EXISTS) {
+        status = CONSTANTS.HTTP_STATUS.CONFLICT;
+        message = CONSTANTS.ERROR_MESSAGES.EMAIL_ALREADY_EXISTS;
+      }
+
+      res.status(status).json({ error: message });
+    }
+  },
+
   // 🔹 Login
   async login(req, res) {
     try {

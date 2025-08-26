@@ -6,6 +6,9 @@ const router = express.Router();
 // Login
 router.post('/login', authController.login);
 
+//Register
+router.post('/register', authController.register);
+
 // OTP flow
 router.post('/forgot-password-otp', authController.forgotPasswordOTP);
 router.post('/verify-otp', authController.verifyOTP);
