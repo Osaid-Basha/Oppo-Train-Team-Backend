@@ -7,13 +7,51 @@ const isValidYouTubeUrl = url => {
   return regex.test(url);
 };
 
+// HEAD can be unreliable for some hosts; tiny GET range is safer.
 const isUrlAccessible = async url => {
   try {
-    await axios.head(url);
-    return true;
+    const resp = await axios.get(url, {
+      maxRedirects: 5,
+      timeout: 8000,
+      headers: { Range: 'bytes=0-0' }
+    });
+    return resp.status >= 200 && resp.status < 400;
   } catch {
     return false;
   }
+};
+
+/**
+ * Resolve a category input (ID or name) to a Firestore document ID.
+ * - Tries direct doc(id) first (no sanitization; IDs must remain exact).
+ * - If not found, tries lookup by name == sanitized(name).
+ * Returns: { id, doc } or null if not found.
+ */
+const resolveCategoryByIdOrName = async (categoryInput) => {
+  if (typeof categoryInput !== 'string' || !categoryInput.trim()) return null;
+
+  const candidate = categoryInput.trim();
+
+  // Try as ID first
+  let doc = await db.collection('categories').doc(candidate).get();
+  if (doc.exists) {
+    return { id: doc.id, doc };
+  }
+
+  // Fallback: try as name (sanitize as human text)
+  const sanitizedName = helpers.sanitizeInput(candidate);
+  const byName = await db
+    .collection('categories')
+    .where('name', '==', sanitizedName)
+    .limit(1)
+    .get();
+
+  if (!byName.empty) {
+    const first = byName.docs[0];
+    return { id: first.id, doc: first };
+  }
+
+  return null;
 };
 
 // List resources with filtering and pagination
@@ -61,7 +99,7 @@ const listResources = async (req, res) => {
   }
 };
 
-// Create new resource
+// Create new resource (accepts category ID or name)
 const createResource = async (req, res) => {
   try {
     const { title, description = '', type, url, thumbnail_url = '', category, tags = [], is_active = true } = req.body;
@@ -77,8 +115,8 @@ const createResource = async (req, res) => {
     const sanitizedDesc = helpers.sanitizeInput(description);
     const sanitizedUrl = helpers.sanitizeInput(url);
     const sanitizedThumb = helpers.sanitizeInput(thumbnail_url);
-    const sanitizedCategory = helpers.sanitizeInput(category);
 
+    // URL validation
     try {
       new URL(sanitizedUrl);
     } catch {
@@ -102,13 +140,15 @@ const createResource = async (req, res) => {
       });
     }
 
-    const catDoc = await db.collection('categories').doc(sanitizedCategory).get();
-    if (!catDoc.exists) {
+    // Resolve category by ID or name (Option B)
+    const resolved = await resolveCategoryByIdOrName(category);
+    if (!resolved) {
       return res.status(400).json({
         success: false,
         error: { code: 'VALIDATION_ERROR', message: 'Category does not exist', details: { field: 'category' } }
       });
     }
+    const categoryId = resolved.id;
 
     const now = new Date();
     const data = {
@@ -117,7 +157,7 @@ const createResource = async (req, res) => {
       type,
       url: sanitizedUrl,
       thumbnail_url: sanitizedThumb,
-      category: sanitizedCategory,
+      category: categoryId,
       tags: Array.isArray(tags) ? tags.map(t => helpers.sanitizeInput(t)) : [],
       is_active,
       created_by: req.user.uid,
@@ -163,12 +203,13 @@ const getResource = async (req, res) => {
   }
 };
 
-// Update resource
+// Update resource (accepts category ID or name)
 const updateResource = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = { ...req.body };
 
+    // Validate & check URL if provided
     if (updates.url) {
       try {
         new URL(updates.url);
@@ -178,7 +219,7 @@ const updateResource = async (req, res) => {
           error: { code: 'VALIDATION_ERROR', message: 'Invalid URL format', details: { field: 'url' } }
         });
       }
-      if (updates.type === 'video' && !isValidYouTubeUrl(updates.url)) {
+      if ((updates.type === 'video' || !updates.type) && !isValidYouTubeUrl(updates.url) && (updates.type === 'video')) {
         return res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'Invalid YouTube URL format', details: { field: 'url' } }
@@ -192,18 +233,21 @@ const updateResource = async (req, res) => {
       }
     }
 
+    // Resolve category by ID or name if provided
     if (updates.category) {
-      const catDoc = await db.collection('categories').doc(updates.category).get();
-      if (!catDoc.exists) {
+      const resolved = await resolveCategoryByIdOrName(updates.category);
+      if (!resolved) {
         return res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'Category does not exist', details: { field: 'category' } }
         });
       }
+      updates.category = resolved.id;
     }
 
+    // Sanitize string fields EXCEPT 'category' (to avoid mangling IDs)
     Object.keys(updates).forEach(key => {
-      if (typeof updates[key] === 'string') {
+      if (key !== 'category' && typeof updates[key] === 'string') {
         updates[key] = helpers.sanitizeInput(updates[key]);
       }
     });
@@ -237,65 +281,13 @@ const deleteResource = async (req, res) => {
   }
 };
 
-// Bulk create/update resources
-const bulkUpsertResources = async (req, res) => {
-  try {
-    const resources = Array.isArray(req.body.resources) ? req.body.resources : [];
-    if (!resources.length) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'No resources provided' }
-      });
-    }
 
-    const batch = db.batch();
-    const now = new Date();
 
-    for (const r of resources) {
-      const ref = r.id ? db.collection('resources').doc(r.id) : db.collection('resources').doc();
-      batch.set(ref, { ...r, updated_at: now, created_at: r.created_at || now, created_by: req.user.uid }, { merge: true });
-    }
-
-    await batch.commit();
-
-    res.json({ success: true, message: 'Bulk operation completed successfully' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
-  }
-};
-
-// Bulk activate/deactivate resources
-const bulkActivateResources = async (req, res) => {
-  try {
-    const { ids = [], is_active = true } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'No resource IDs provided' }
-      });
-    }
-
-    const batch = db.batch();
-    const now = new Date();
-    ids.forEach(id => {
-      const ref = db.collection('resources').doc(id);
-      batch.update(ref, { is_active, updated_at: now });
-    });
-    await batch.commit();
-
-    res.json({ success: true, message: 'Resources updated successfully' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
-  }
-};
 
 module.exports = {
   listResources,
   createResource,
   getResource,
   updateResource,
-  deleteResource,
-  bulkUpsertResources,
-  bulkActivateResources
+  deleteResource
 };
-
