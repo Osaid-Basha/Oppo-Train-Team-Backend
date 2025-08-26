@@ -27,4 +27,7 @@ router.post("/:eventId/register", registrations.registerForEvent);
 // List Event Registrations
 router.get("/:eventId/registrations", registrations.listEventRegistrations);
 
+// Acept Registrations
+router.post("/:registrationId/accept", registrations.acceptRegistration);
+
 module.exports = router;

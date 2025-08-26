@@ -14,6 +14,7 @@ router.use("/users", userRoutes);
 router.use("/events", eventRoutes);
 router.use("/registrations", registrationRoutes);
 
+
 router.use("/resources", resourceRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/auth", authRoutes);
