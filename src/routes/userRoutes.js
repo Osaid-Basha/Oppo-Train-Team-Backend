@@ -1,19 +1,13 @@
-//example of user routes
-const express = require("express");
-const { getUsers, addUser, updateUser, deleteUser } = require("../controllers/userController");
+const express = require('express');
+const userController = require('../controllers/userController');
+const { authenticateUser } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// GET all users
-router.get("/", getUsers);
+// GET /api/users/profile - Get user profile
+router.get('/', authenticateUser, userController.getProfile);
 
-// POST new user
-router.post("/", addUser);
-
-// PUT update user
-router.put("/:id", updateUser);
-
-// DELETE user
-router.delete("/:id", deleteUser);
+// PUT /api/users/profile - Update user profile
+router.put('/:id', authenticateUser, userController.updateProfile);
 
 module.exports = router;
