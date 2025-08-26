@@ -7,6 +7,7 @@ const adminRoutes = require("./adminRoute");
 const memberRoutes = require("./memberRoute");
 const resourceRoutes = require("./resourceRoutes");
 const categoryRoutes = require("./categoryRoutes");
+const dashboardRoutes = require("./dashboardRoute");
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.use("/categories", categoryRoutes);
 router.use("/auth", authRoutes);
 router.use("/admin", adminRoutes);
 router.use("/member", memberRoutes);
+router.use("/dashboard", dashboardRoutes);
 
 module.exports = router;
 
