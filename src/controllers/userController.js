@@ -3,7 +3,7 @@ const { db } = require("../config/firebase");
 // جلب جميع المستخدمين
 const getUsers = async (req, res) => {
   try {
-    const snapshot = await db.collection("users").get();
+    const snapshot = await db.collection("user").get();
     const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(users);
   } catch (error) {
@@ -22,7 +22,7 @@ const addUser = async (req, res) => {
       key => userData[key] === undefined && delete userData[key]
     );
 
-    const docRef = await db.collection("users").add(userData);
+    const docRef = await db.collection("user").add(userData);
     res.json({ id: docRef.id, message: "User added successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -40,7 +40,7 @@ const updateUser = async (req, res) => {
       key => updateData[key] === undefined && delete updateData[key]
     );
 
-    await db.collection("users").doc(id).update(updateData);
+    await db.collection("user").doc(id).update(updateData);
     res.json({ message: "User updated successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -51,7 +51,7 @@ const updateUser = async (req, res) => {
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    await db.collection("users").doc(id).delete();
+    await db.collection("user").doc(id).delete();
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
