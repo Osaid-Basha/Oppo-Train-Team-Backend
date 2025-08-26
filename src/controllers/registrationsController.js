@@ -122,8 +122,4 @@ const acceptRegistration = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
 module.exports = { registerForEvent, listEventRegistrations, acceptRegistration };
-=======
-module.exports = { registerForEvent, listEventRegistrations, acceptRegistration };
->>>>>>> 85365dd (adding the endpoints for events and registerations)
