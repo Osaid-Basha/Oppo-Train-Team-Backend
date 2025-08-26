@@ -1,6 +1,7 @@
 const express = require("express");
 const userRoutes = require("./userRoutes");
 const eventRoutes = require("./eventRoutes");
+const registrationRoutes = require("./registrationRoutes");
 const authRoutes = require("./authRoute");
 const adminRoutes = require("./adminRoute");
 const memberRoutes = require("./memberRoute");
@@ -11,6 +12,7 @@ const router = express.Router();
 
 router.use("/users", userRoutes);
 router.use("/events", eventRoutes);
+router.use("/registrations", registrationRoutes);
 
 router.use("/resources", resourceRoutes);
 router.use("/categories", categoryRoutes);

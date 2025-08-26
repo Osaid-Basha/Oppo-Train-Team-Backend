@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const events = require("../controllers/eventsController");
-const attendees = require("../controllers/attendeesController");
+const registrations = require("../controllers/registrationsController");
 
 // ==================== Events ====================
 
@@ -19,19 +19,12 @@ router.patch("/:eventId", events.updateEvent);
 //Delete Event
 router.delete("/:eventId", events.deleteEvent);
 
+// ==================== Registrations ====================
 
-// ==================== Attendees ====================
+// Register for Event
+router.post("/:eventId/register", registrations.registerForEvent);
 
-//Add Attendee to Event
-router.post("/:eventId/attendees", attendees.addAttendee);
-
-//Get All Attendees
-router.get("/:eventId/attendees", attendees.listAttendees);
-
-//Check-in Attendee
-router.post("/:eventId/attendees/:userId/check-in", attendees.checkInAttendee);
-
-//Remove Attendee from Event    
-router.delete("/:eventId/attendees/:userId", attendees.removeAttendee);
+// List Event Registrations
+router.get("/:eventId/registrations", registrations.listEventRegistrations);
 
 module.exports = router;
