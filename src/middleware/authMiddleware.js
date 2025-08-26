@@ -9,7 +9,7 @@ const authenticateUser = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
     const decodedToken = await admin.auth().verifyIdToken(token);
-    
+
     // Get user data from Firestore
     const userDoc = await db.collection('users').doc(decodedToken.uid).get();
     if (!userDoc.exists) {
@@ -21,7 +21,7 @@ const authenticateUser = async (req, res, next) => {
       email: decodedToken.email,
       ...userDoc.data()
     };
-    
+
     next();
   } catch (error) {
     console.error('Authentication error:', error);
@@ -29,4 +29,26 @@ const authenticateUser = async (req, res, next) => {
   }
 };
 
-module.exports = { authenticateUser };
+const authenticateOptional = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+      if (userDoc.exists) {
+        req.user = {
+          uid: decodedToken.uid,
+          email: decodedToken.email,
+          ...userDoc.data()
+        };
+      }
+    } catch (error) {
+      console.error('Optional auth error:', error);
+    }
+  }
+  next();
+};
+
+module.exports = { authenticateUser, authenticateOptional };
+
