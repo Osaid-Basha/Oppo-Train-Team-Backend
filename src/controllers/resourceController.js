@@ -281,7 +281,86 @@ const deleteResource = async (req, res) => {
   }
 };
 
+// Bulk upsert resources
+const bulkUpsertResources = async (req, res) => {
+  try {
+    const { resources } = req.body;
+    
+    if (!Array.isArray(resources) || resources.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Resources array is required and must not be empty' }
+      });
+    }
 
+    const results = [];
+    const errors = [];
+
+    for (const resource of resources) {
+      try {
+        const { id, ...resourceData } = resource;
+        
+        if (id) {
+          // Update existing resource
+          await db.collection('resources').doc(id).update({
+            ...resourceData,
+            updated_at: new Date()
+          });
+          results.push({ id, action: 'updated' });
+        } else {
+          // Create new resource
+          const docRef = await db.collection('resources').add({
+            ...resourceData,
+            created_at: new Date(),
+            updated_at: new Date(),
+            is_active: true
+          });
+          results.push({ id: docRef.id, action: 'created' });
+        }
+      } catch (error) {
+        errors.push({ resource, error: error.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: { results, errors },
+      message: `Bulk operation completed. ${results.length} successful, ${errors.length} failed.`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
+  }
+};
+
+// Bulk activate resources
+const bulkActivateResources = async (req, res) => {
+  try {
+    const { resourceIds } = req.body;
+    
+    if (!Array.isArray(resourceIds) || resourceIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Resource IDs array is required and must not be empty' }
+      });
+    }
+
+    const batch = db.batch();
+    
+    resourceIds.forEach(id => {
+      const ref = db.collection('resources').doc(id);
+      batch.update(ref, { is_active: true, updated_at: new Date() });
+    });
+
+    await batch.commit();
+
+    res.json({
+      success: true,
+      message: `${resourceIds.length} resources activated successfully`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
+  }
+};
 
 
 module.exports = {
@@ -289,5 +368,7 @@ module.exports = {
   createResource,
   getResource,
   updateResource,
-  deleteResource
+  deleteResource,
+  bulkUpsertResources,
+  bulkActivateResources
 };

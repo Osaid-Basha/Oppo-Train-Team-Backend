@@ -3,10 +3,15 @@ const { FieldValue } = require("firebase-admin/firestore");
 
 // ==================== Event Management ====================
 
-// Create Event
+// Create Event with local image
 const createEvent = async (req, res) => {
   try {
     const data = req.body || {};
+
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = `/uploads/events/${req.file.filename}`; // رابط الصورة
+    }
 
     const eventData = {
       title: data.title,
@@ -21,6 +26,7 @@ const createEvent = async (req, res) => {
       status: data.status || "draft",
       requirements: data.requirements || "",
       created_by: data.created_by || "",
+      image_url: imageUrl, // 🔥 التخزين المحلي
       created_at: FieldValue.serverTimestamp(),
       updated_at: FieldValue.serverTimestamp()
     };
@@ -33,6 +39,7 @@ const createEvent = async (req, res) => {
       message: "Event created successfully"
     });
   } catch (error) {
+    console.error("Event create error:", error);
     res.status(500).json({
       success: false,
       error: { code: "EVENT_CREATE_FAILED", message: error.message }
