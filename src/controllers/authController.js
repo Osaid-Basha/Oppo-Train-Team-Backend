@@ -1,15 +1,25 @@
 const axios = require("axios");
-const { db } = require("../config/firebase");
+const { db, auth } = require("../config/firebase"); // لاحظ ضفت auth
+const nodemailer = require("nodemailer");
+
+const apiKey = process.env.FIREBASE_API_KEY;
+
+// helper لتوليد OTP
+function generateOTP() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 const authController = {
+  // 🔹 Login
   async login(req, res) {
     try {
       const { email, password } = req.body;
 
-      // API key من .env
-      const apiKey = process.env.FIREBASE_API_KEY;
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
 
-      // استدعاء Firebase REST API
+      // Firebase REST API login
       const response = await axios.post(
         `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
         { email, password, returnSecureToken: true }
@@ -22,7 +32,7 @@ const authController = {
 
       res.json({
         message: "Login successful",
-        token: idToken, // 🔥 تستعمله في Postman
+        token: idToken,
         user: userDoc.exists ? userDoc.data() : { email },
       });
     } catch (error) {
@@ -31,6 +41,90 @@ const authController = {
         error: "Login failed",
         message: error.response?.data?.error?.message || error.message,
       });
+    }
+  },
+
+  // 🔹 Forgot Password using OTP (6 digits)
+  async forgotPasswordOTP(req, res) {
+    try {
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ error: "Email is required" });
+
+      const otp = generateOTP();
+      const expiresAt = Date.now() + 5 * 60 * 1000; // صالح 5 دقائق
+
+      // خزن الكود في Firestore
+      await db.collection("password_resets").doc(email).set({ otp, expiresAt });
+
+      // ابعت الإيميل (بإستخدام nodemailer + Gmail)
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+
+      await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: email,
+        subject: "Your OTP Code",
+        text: `Your password reset code is: ${otp} (valid for 5 minutes)`,
+      });
+
+      res.json({ message: "OTP sent to email" });
+    } catch (error) {
+      console.error("Forgot password OTP error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // 🔹 Verify OTP
+  async verifyOTP(req, res) {
+    try {
+      const { email, otp } = req.body;
+      const doc = await db.collection("password_resets").doc(email).get();
+
+      if (!doc.exists) return res.status(400).json({ error: "No reset request found" });
+
+      const data = doc.data();
+      if (data.otp !== otp) return res.status(400).json({ error: "Invalid OTP code" });
+      if (Date.now() > data.expiresAt) return res.status(400).json({ error: "OTP expired" });
+
+      res.json({ message: "OTP verified successfully" });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // 🔹 Reset Password بعد OTP
+  async resetPasswordWithOTP(req, res) {
+    try {
+      const { email, otp, newPassword } = req.body;
+      if (!email || !otp || !newPassword) {
+        return res.status(400).json({ error: "Email, OTP and new password are required" });
+      }
+
+      const doc = await db.collection("password_resets").doc(email).get();
+      if (!doc.exists) return res.status(400).json({ error: "No reset request found" });
+
+      const data = doc.data();
+      if (data.otp !== otp) return res.status(400).json({ error: "Invalid OTP code" });
+      if (Date.now() > data.expiresAt) return res.status(400).json({ error: "OTP expired" });
+
+      // نجيب اليوزر من Firebase Authentication
+      const userRecord = await auth.getUserByEmail(email);
+
+      // نحدث الباسورد
+      await auth.updateUser(userRecord.uid, { password: newPassword });
+
+      // احذف الكود من Firestore (عشان ما ينفع يستعمله مرتين)
+      await db.collection("password_resets").doc(email).delete();
+
+      res.json({ message: "Password has been reset successfully using OTP" });
+    } catch (error) {
+      console.error("Reset password with OTP error:", error);
+      res.status(500).json({ error: error.message });
     }
   },
 };
