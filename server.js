@@ -1,3 +1,5 @@
+require("dotenv").config();   // ⬅️ لازم يجي أول إشي
+
 const app = require("./src/app");
 
 const PORT = process.env.PORT || 5000;
